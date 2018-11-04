@@ -71,9 +71,9 @@ epochs = mne.Epochs(raw,
                     #reject=reject,
                     reject_by_annotation=True)
 
-#epochs.drop_bad()
-#epochs.plot_drop_log()
 
+epochs.drop_bad()
+epochs.plot_drop_log()
 epochs.plot()
 
 
