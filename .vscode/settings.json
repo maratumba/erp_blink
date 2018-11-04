@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "/opt/local/bin/python2.7"
+    "python.pythonPath": "/Users/gulyamani/anaconda2/envs/mne/bin/python",
+    "python.venvPath": "/Users/gulyamani/anaconda2/envs/"
 }
