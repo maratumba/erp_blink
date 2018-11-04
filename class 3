@@ -1,0 +1,480 @@
+Class 3
+
+(it's not a problem to have both Python 2 and Python 3)
+
+install mne and other stuff through iterm (i saved it all in 'class 3 iterm preinstall stuff')
+
+to exist python out of iterm - Ctrl D - do you really want to exit - y
+
+you can check which pip or pip3 it is executing by asking:
+which pip
+and it shows it is in the anaconda 3 directory so it's good
+
+
+we are working in IPython: Python 3.6.2 |Anaconda, Inc.| (default, Sep 21 2017, 18:29:43)
+Hanna has 3.6.3 (and Flo also has 3.6.2 and also gets a runtime error)
+#we got rid off the error by uninstalling anaconda's own version of matlib in iterm (Successfully uninstalled matplotlib-2.1.0)
+
+in IPython 'tab' autocompletes
+
+the package comes from:
+https://www.martinos.org/mne/stable/index.html
+list of all commands in the package:
+https://www.martinos.org/mne/stable/python_reference.html
+sample data sets - not downloaded automatically because so big, but mne has a tool to download (in [2])
+
+you can also download directly from: https://osf.io/86qa2/
+(MNE-sample-data-processed.tar.gz (Version: 2))
+
+
+In [1]: import mne
+
+In [2]: mne.datasets.sample.data_path()
+
+In [3]: data_path = mne.datasets.sample.data_path()
+Successfully extracted to: ['/Users/administrator/mne_data/MNE-sample-data']
+
+In [4]: raw_fname = data_path + '/MEG/sample/sample_audvis_filt-0-40_raw.fif'
+
+#this is combined MEG and EEG data, visual input and tones played in left and right ear
+
+In [5]: raw = mne.io.read_raw_fif(raw_fname, preload=True)
+
+Opening raw data file /Users/administrator/mne_data/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif...
+    Read a total of 4 projection items:
+        PCA-v1 (1 x 102)  idle
+        PCA-v2 (1 x 102)  idle
+        PCA-v3 (1 x 102)  idle
+        Average EEG reference (1 x 60)  idle
+    Range : 6450 ... 48149 =     42.956 ...   320.665 secs
+Ready.
+Current compensation grade : 0
+Reading 0 ... 41699  =      0.000 ...   277.709 secs...
+
+#we can plot this:
+
+In [7]: raw.plot()
+BUT
+RuntimeError: Python is not installed as a framework. The Mac OS X backend will not be able to function correctly if Python is not installed as a framework. See the Python documentation for more information on installing Python as a framework on Mac OS X. Please either reinstall Python as a framework, or try one of the other backends. If you are using (Ana)Conda please install python.app and replace the use of 'python' with 'pythonw'. See 'Working with Matplotlib on OSX' in the Matplotlib FAQ for more information.
+
+#this data has partially been filtered, the very high frequencies are gone, eye-movements are still there - large electrical fields cover the brain signals, in combinations with small electrical currents from eyes (dipoles) we get those dips in the signal (changing polarity)
+#color coding: blue MEG channels, black EEG (note the reference channel)
+#MEG picks up the heart beat
+#there are no triggers here, stored in a separate file
+#we close this window
+
+In [8]: events_fname = data_path + '/MEG/sample/sample_audvis_filt-0-40_raw-eve.fif'
+
+In [9]: events = mne.read_events(events_fname)
+
+#events are in a multidimensional array (that we supposedly saw last time)
+
+In [10]: events
+Out[10]:
+array([[ 6994,     0,     2],
+       [ 7086,     0,     3],
+       [ 7192,     0,     1],
+       .....................
+       [42168,     0,    32]], dtype=uint32)
+       #first column is time point in samples
+       #second column can be ignored, info that is never used, that's why it's 0s here
+       #third column: trigger codes, very few here
+
+In [11]: raw.info
+
+#info about the recording, e.g. channel names, bads are electrodes that didn't record properly
+#we see a high-pass filter already applied here, and lowpass - together make a bandpass filter
+#brainvision format
+#sfreq is the sampling rate - here weird because of the MEG machine
+#We pull up individual values from this:
+
+In [12]: raw.info['sfreq']
+Out[12]: 150.15374755859375
+
+#We will use IPython MAGIC - commands preceded by % (e.g. you can use %past to paste in the Ctrl-c text here in Atom)
+
+In [13]: %history
+import mne
+mne.datasets.sample.data_path()
+data_path = mne.datasets.sample.data_path()
+raw_fname = data_path + '/MEG/sample/sample_audvis_filt-0-40_raw.fif'
+raw = mne.io.read_raw_fif(raw_fname, preload=True)
+raw.plot
+raw.plot()
+events_fname = data_path + '/MEG/sample/sample_audvis_filt-0-40_raw-eve.fif'
+events = mne.read_events(events_fname)
+events
+raw.info
+raw.info['sfreq']
+%history
+
+#You can get help by typing (same as in the documentation on MNE website)
+In [15]: ?raw
+#to get out, press Q
+
+In [16]: ?raw.plot
+
+In [17]: raw.plot(events=events)
+#now it will plot the events too
+
+#converting the first column to time: divide by sample rate
+#this gives is us the first row (remember, we're counting from 0)
+In [18]: events[0,:]
+Out[18]: array([6994,    0,    2], dtype=uint32)
+
+#: says take all the columns
+
+In [19]: events[:,0]
+#all rows in 1st column
+
+In [20]: events[:,0] / raw.info['sfreq']
+#seconds - we see this is less than 3 minutes of EEG
+#to get miliseconds:
+In [21]: events[:,0] / raw.info['sfreq'] * 1000
+
+#when importing a module you can give in acronym to type less whenever you call it
+In [23]: import numpy as np
+
+#numpy module has a method 'unique'
+In [24]: np.unique(events[:,2])
+Out[24]: array([ 1,  2,  3,  4,  5, 32], dtype=uint32)
+
+#iterm shows IPython terms in green, so never use the names that occur in green as variable names
+
+#filtering in MNE is done in place by default - will modify the object itself
+#bottom and top edge of the band pass, typically .3 to ... Hz - today much milder than in the past
+#here we try a very harsh filter:
+In [25]: raw.filter(1,20)
+#don't worry about message about changing the defaults unless you know what they mean
+#now the data looks much flatter in the plot, because we have eliminated a large part of the signal!
+#the filtering is very fast on MNE, module for filtering reworked in the last 2 years
+
+#this will show us that no much going on in the data that we filtered out:
+In [25]: raw.plot_psd()
+In [25]: raw.plot_psd(fmin=3, fmax=15)
+
+#change of reference points can make a huge difference
+#we always measure voltage in reference to something, you can compute anything from another reference
+#by default MNE measures reference to average, which is good for localization, but not for us
+#we reference to mastoids - this sample recording doesn't have it, because it is not a language experiment
+#the argument to the function is a list: list of electrodes you want to use, channel indexes (not names)
+#list of channel names:
+In [25]: raw.ch_names[0]
+Out[25]: 'MEG 0113'
+In [26]: raw.ch_names[-1]
+Out[26]: 'EOG 061'
+
+In [25]: raw.set_eeg_reference([0...........
+
+#converting to epoch recording
+#name our collection of epochs
+
+#tmin tells you the starting point of your epoch, e.g. -200ms before your event, to 1200ms to after the trigger
+
+In [27]: epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2)
+319 matching events found
+Created an SSP operator (subspace dimension = 4)
+4 projection items activated
+
+In [28]: epochs.plot()
+#ways to detect bad segments
+In [28]: epochs
+Out[28]:
+<Epochs  |  n_events : 319 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.6 MB, data not loaded,
+ '1': 72, '2': 73, '3': 73, '32': 16, '4': 70, '5': 15>
+#his version shows 'all good', instead of 'good & bad' -- that's because not all good
+#the names (numbers) are converted to strings
+#now you can treat this object as a dictionary and pull things out
+In [29]: epochs['1']
+Out[29]: <Epochs  |  n_events : 72 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.6 MB, data not loaded>
+#and plot just this
+In [30]: epochs['1'].plot()
+
+#giving them meaningful names (for your own design):
+#this is just the dictionary so we give it 'keys' and one value per key
+In [30]: codes = {'Aud/Left': 1, 'Aud/Right': 2, 'Vis/Left': 3, 'Vis/Right': 4}
+#now pass this information to the epochs object
+In [31]: epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes)
+288 matching events found
+Created an SSP operator (subspace dimension = 4)
+4 projection items activated
+
+In [32]: epochs
+Out[32]:
+<Epochs  |  n_events : 288 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.6 MB, data not loaded,
+ 'Aud/Left': 72, 'Aud/Right': 73, 'Vis/Left': 73, 'Vis/Right': 70>
+
+#the cool thing about / in MNE is that is treated as a hierarchy - we can pull up all the Aud stuff, etc.
+
+In [33]: epochs['Aud']
+Out[33]:
+<Epochs  |  n_events : 145 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.6 MB, data not loaded,
+ 'Aud/Left': 72, 'Aud/Right': 73>
+
+In [34]: epochs['Aud/Right']
+Out[34]: <Epochs  |  n_events : 73 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.6 MB, data not loaded>
+
+In [35]: epochs.plot_image()
+In [35]: epochs.plot_topo_image()
+
+In [35]: erp = epochs['Vis'].average()
+
+In [36]: erp
+Out[36]: <Evoked  |  comment : '0.51 * Vis/Left + 0.49 * Vis/Right', kind : average, time : [-0.199795, 1.198771], n_epochs : 143, n_channels x n_times : 366 x 211, ~4.2 MB>
+
+In [37]: erp.plot()
+#we get a butterfly plot, you want to have these bumps at 200ms for visual presentation
+
+In [37]: erp.plot_joint()
+#every line is a different sensor on the scalp
+#you get the topographic plots for free - these are for a single condition
+#so to get difference plots:
+
+In [37]: left = epochs['Vis/Left'].average()
+
+In [38]: right  = epochs['Vis/Right'].average()
+
+In [39]: diff = mne.combine_evoked([left,right],[1,-1])
+#sum multiplied by weights, 1,-1
+
+In [40]: diff.plot()
+In [40]: diff.plot_joint()
+#they saw small dots on the screen - early visual effects show up in the rear of the scalp
+#so you can compute the arbitrary combinations of erps
+
+#average of subject averages
+In [40]: grand_grand = mne.combine_evoked([left,right],[0.5,0.5])
+
+#the epochs constructor command has a lot of options, baseline, which channels, rejections, for detecting flatlining (when a channel goes bad), to decimate (changing the sampling rate after the fact, this command leaves out samples to lower the sample rate), specify separate windows for rejections, e.g. first 500ms after trigger, detrending (nothing; 2nd option dcoffset - Steve Luck talks about this; linear detrend for increases over the whole experiment, e.g. when people sweat),...
+
+#storing the channels as an array is what makes MNE difficult
+#functions to convert:
+In [27]: mne.pick_types(raw.info, eeg=True, meg=False, eog=False)
+#gives the list of channels, indexes, containing EEG
+
+In [28]: picks = mne.pick_types(raw.info, eeg=True, meg=False, eog=False)
+
+In [29]: epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks)
+288 matching events found
+Created an SSP operator (subspace dimension = 1)
+4 projection items activated
+
+In [30]: epochs.plot()
+
+#we can also define rejection criteria (a bit difficult to use in MNE)
+#they are a dictionary, specified in Volt, not MicroVolt (MNE uses the base units, seconds, Volts, etc.)
+#the threshold is not absolute, but peak to peak, so 150 MicroVolts peak to peak, bigger for eyes = not plausible values for brain-based activity
+#EEProbe using a sliding window threshold, not peak to peak
+In [32]: rejection = {'eeg':150e-6, 'eog':250e-6}
+#but we have no eog
+In [34]: rejection = {'eeg':150e-6}
+
+#you can also find a minimal jump - the flat line rejection criteria (if there are no jumps, then something is wrong with an electrode)
+#at a raw recording level 5mV is not a huge number, it is in an average
+In [33]: flatline = {'eeg':5e-6}
+
+In [35]: epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks, reject = rejection
+    ...: , flat = flatline)
+288 matching events found
+Created an SSP operator (subspace dimension = 1)
+4 projection items activated
+
+In [36]: epochs
+Out[36]:
+<Epochs  |  n_events : 288 (good & bad), tmin : -0.199795213158 (s), tmax : 1.19877127895 (s), baseline : (None, 0), ~3.1 MB, data not loaded,
+ 'Aud/Left': 72, 'Aud/Right': 73, 'Vis/Left': 73, 'Vis/Right': 70>
+
+ In [37]: epochs.plot()
+Loading data for 288 events and 211 original time points ...
+    Rejecting  epoch based on EEG : ['EEG 001', 'EEG 002', 'EEG 003', 'EEG 007']
+    Rejecting  epoch based on EEG : ['EEG 002', 'EEG 003']
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 008']
+5 bad epochs dropped
+Loading data for 20 events and 211 original time points ...
+Out[37]: <matplotlib.figure.Figure at 0x1c47775b00>
+
+#we can drop the bad epochs
+In [38]: epochs.drop_bad()
+
+#DC Offset - good thing to do, we set it to 0
+#baseline=None - don't do any baseline correction, is how he does it, but not the popular methods in the list
+#baseline=[0,0.5] - time from 0 to 0.5 locked to the trigger, so obviously not a good window
+#often we want pre-stimulus window but hard to remember, so instead, take the start of your epoch and go to 0 (None,0) (same logic to go the other way (0,None) - nonsensical, (None,None) is the whole epoch, the same thing as DCOffset, this is useful if motion artifacts when recording during breaks and the participants is moving - this is the DCOffset only during ...)
+
+#baselining and filtering - huge argument in literature 2015-16
+
+In [40]: epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks, reject = rejection
+    ...: , flat = flatline, detrend=0, baseline=None)
+288 matching events found
+Created an SSP operator (subspace dimension = 1)
+4 projection items activated
+
+#library of plotting methods
+
+In [41]: mne.viz.plot_compare_evokeds([epochs['Vis'].average(), epochs['Aud'].average()])
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 001', 'EEG 002', 'EEG 003', 'EEG 007']
+    Rejecting  epoch based on EEG : ['EEG 002', 'EEG 003']
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 008']
+<ipython-input-41-4efbb970cd27>:1: RuntimeWarning: No picks, plotting the GFP ...
+  mne.viz.plot_compare_evokeds([epochs['Vis'].average(), epochs['Aud'].average()])
+No picks, plotting the GFP ...
+Out[41]: <matplotlib.figure.Figure at 0x1c48112518>
+#note that this is Global Field Power, not single channel ERPs
+
+#to have legend show up, pass the dictionary to the function
+In [42]: mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()})
+
+#you can plot confidence intervals as well, but we have a single subject here
+
+In [45]: mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},p
+    ...: icks=[0])
+#now we have the head, negative down
+
+#negative up:
+In [46]: mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},p
+    ...: icks=[0], invert_y=True)
+
+
+#####ICA - Individual Component Analysis
+In [48]: ic = mne.preprocessing.ICA()
+
+#MNE ingrates with the toolking PsychitLearn - it creates and objects and fits it to a learning method:
+In [49]: ic.fit(epochs)
+Fitting ICA to data using 59 channels.
+Please be patient, this may take some time
+Inferring max_pca_components from picks.
+Loading data for 288 events and 211 original time points ...
+    Rejecting  epoch based on EEG : ['EEG 001', 'EEG 002', 'EEG 003', 'EEG 007']
+    Rejecting  epoch based on EEG : ['EEG 002', 'EEG 003']
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 008']
+    Rejecting  epoch based on EEG : ['EEG 008']
+5 bad epochs dropped
+Using all PCA components: 59
+Loading data for 283 events and 211 original time points ...
+Out[49]: <ICA  |  epochs decomposition, fit (fastica): 59713 samples, 59 components, channels used: "eeg">
+
+#plot components, one component for channel:
+In [50]: ic.plot_components()
+#my plots are different than his and than Diana's
+
+In [51]: ic.plot_properties(epochs)
+#will plot for each components, so takes time and battery
+
+#once you have the ICA, you subtract the components that don't reflect brain activity
+
+#the fit method does the decomposition, the apply method applies it
+In [51]: epochs.load_data()
+#loads them to working memory to speed up
+In [52]: ic_corrected = ic.apply(epochs, include=[0])
+Transforming to ICA space (59 components)
+Zeroing out 58 ICA components
+
+
+#Again, the whole ICA proces:
+In [53]: ic = mne.preprocessing.ICA()
+
+In [54]: ic.fit(epochs)
+Fitting ICA to data using 59 channels.
+Please be patient, this may take some time
+Inferring max_pca_components from picks.
+Using all PCA components: 59
+Out[54]: <ICA  |  epochs decomposition, fit (fastica): 59713 samples, 59 components, channels used: "eeg">
+
+In [56]: ic_corrected = ic.apply(epochs, include=[0])
+Transforming to ICA space (59 components)
+Zeroing out 58 ICA components
+
+#you need to have good eye-recording for this (?)
+
+
+#to look for solutions to your problems:
+https://mail.nmr.mgh.harvard.edu/pipermail//mne_analysis/
+https://github.com/mne-tools/mne-python/issues
+https://github.com/mne-tools/mne-python/wiki
+
+
+#Exporting data:
+In [56]: ic_corrected = ic.apply(epochs, include=[0])
+Transforming to ICA space (59 components)
+Zeroing out 58 ICA components
+
+In [57]: df = epochs.to_data_frame()
+Converting time column to int64...
+
+In [58]: df.to_csv('example.csv')
+#this data may now be used for stats in R
+
+
+#you may have to install Pandas (but it works for me)
+In [59]: import pandas as pd
+
+
+
+
+%hist
+%history
+%paste
+%paste
+%paste
+%paste
+raw.plot()
+%paste
+%paste
+raw.plot(events=events)
+%paste
+raw.plot_psd()
+raw.plot_psd(fmin=3, fmax=15)
+%paste
+%paste
+%paste
+%paste
+%paste
+epochs.plot_image()
+erp = epochs['Vis'].average()
+erp.plot_joint()
+left = epochs['Vis/Left'].average()
+right  = epochs['Vis/Right'].average()
+diff = mne.combine_evoked([left,right],[1,-1])
+diff.plot_joint()
+grand_grand = mne.combine_evoked([left,right],[0.5,0.5])
+mne.pick_types(raw.info, eeg=True)
+mne.pick_types(raw.info, eeg=True, meg=False, eog=False)
+picks = mne.pick_types(raw.info, eeg=True, meg=False, eog=False)
+epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks)
+epochs.plot()
+rejection = {'eeg'=150e-6, 'eog'=250e-6}
+rejection = {'eeg':150e-6, 'eog':250e-6}
+flatline = {'eeg':5e-6}
+rejection = {'eeg':150e-6}
+epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks, reject = rejection, flat = flatline)
+epochs
+epochs.plot()
+epochs.drop_bad()
+epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks, reject = rejection, flat = flatline, detrend=0, baseline=None, ))
+epochs = mne.Epochs(raw, events, tmin=-0.2, tmax=1.2, event_id=codes, picks=picks, reject = rejection, flat = flatline, detrend=0, baseline=None)
+mne.viz.plot_compare_evokeds([epochs['Vis'].average(), epochs['Aud'].average()])
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()})
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average(),picks=[0]})
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},picks=[0})
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},picks=[0])
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},picks=[0], invert_y=True)
+mne.viz.plot_compare_evokeds({'visual':epochs['Vis'].average(), 'auditory':epochs['Aud'].average()},picks=[0], invert_y=True)
+ic = mne.preprocessing.ICA()
+ic.fit(epochs)
+ic.plot_components()
+epochs.load_data()
+ic_corrected = ic.apply(epochs, include=[0])
+ic = mne.preprocessing.ICA()
+ic.fit(epochs)
+ic.fit(epochs)
+ic_corrected = ic.apply(epochs, include=[0])
+df = epochs.to_data_frame()
+df.to_csv('example.csv')
+%hist
+
+In [60]:

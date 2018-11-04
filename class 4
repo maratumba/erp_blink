@@ -1,0 +1,201 @@
+Class 4
+
+Barbaras-MacBook-Pro:~ administrator$ pip install --user --upgrade philistine
+Collecting philistine
+  Downloading philistine-0.1a1-py3-none-any.whl
+Installing collected packages: philistine
+Successfully installed philistine-0.1a1
+Barbaras-MacBook-Pro:~ administrator$
+
+Barbaras-MacBook-Pro:~ administrator$ python3 -m IPython --matplotlib
+Python 3.6.2 |Anaconda, Inc.| (default, Sep 21 2017, 18:29:43)
+Type 'copyright', 'credits' or 'license' for more information
+IPython 6.2.1 -- An enhanced Interactive Python. Type '?' for help.
+Using matplotlib backend: MacOSX
+
+In [1]:
+
+#Better to start python from the directory wher you have your files:
+
+Barbaras-MacBook-Pro:~ administrator$ cd Garfield
+Barbaras-MacBook-Pro:Garfield administrator$ python3 -m IPython --matplotlib
+
+In [1]: import mne
+
+In [2]: import philistine
+
+In [3]: raw = mne.io.read_raw_brainvision('garfield0001.vhdr')
+
+#almost all triggers on brainvision are s+number, those are status triggers and as default they are dropped, here:
+Currently, 1 trigger(s) will be dropped, such as [actiCAP Data On].
+#not important for our analysis
+
+In [4]: raw.plot()
+Out[4]: <matplotlib.figure.Figure at 0x80fcf59e8>
+
+In [5]:
+
+#channel st014 is the stimulation channel, i.e. for triggers
+
+#rename mastoids, and eye electrodes to more standard names
+In [9]: mne.rename_channels(raw.info, {'T7':'A1', 'T8':'A2', 'PO9':'IO1', 'PO10':'SO1', 'TP9':'LO1', 'TP10':'L
+   ...: 02'})
+#this modifies the object in place!
+
+
+#now set the eeg reference to the mastoids
+#data needs(?) to be preloaded (RuntimeError: Data needs to be preloaded. Use preload=True (or string) in the constructor.)
+In [11]: raw.load_data()
+In [12]: mne.set_eeg_reference(raw,['A1','A2'])
+Applying a custom EEG reference.
+Out[12]:
+(<RawBrainVision  |  garfield0001.eeg, n_channels x n_times : 33 x 2018460 (4036.9 sec), ~508.3 MB, data loaded>,
+ array([ 0.0002799 ,  0.0002769 ,  0.0002852 , ...,  0.00032705,
+         0.00033775,  0.0003516 ]))
+#for brainvision acticaps there is a virtual reference recording, the passive electrodes have a real reference
+#so we have to reconstruct this (Tim's question)
+#creates a zero channel to reference to the other mastoid
+
+#actually here mastoids are TP9 and TP10, and eyes horizontal T7 and T8
+#just reloading the data didn't work so:
+
+In [15]: raw = mne.io.read_raw_brainvision('garfield0001.vhdr')
+In [16]: raw.load_data()
+In [17]: mne.rename_channels(raw.info, {'TP9':'A1', 'TP10':'A2', 'PO9':'IO1', 'PO10':'SO1', 'T7':'LO1', 'T8':'
+    ...: LO2'})
+In [19]: raw.set_eeg_reference(['A1','A2'])
+    Applying a custom EEG reference.
+    Out[19]: <RawBrainVision  |  garfield0001.eeg, n_channels x n_times : 33 x 2018460 (4036.9 sec), ~508.3 MB, data loaded>
+
+.
+In [27]: raw.set_channel_types({'IO1':'eog', 'SO1':'eog', 'LO1':'eog', 'LO2':'eog'})
+
+In [28]: raw.filter(0.1,30, method='fir')
+In [29]: raw.plot()
+
+In [30]: events = mne.find_events(raw)
+#this events object is the as what we had yesterday
+#third column is the trigger number (second is technically the state of trigger before the trigger occurred so on all our recording is 0)
+In [31]: events[5,:]
+Out[31]: array([9952,    0,   45])
+
+In [32]: events[:5,:]
+Out[32]:
+array([[5174,    0,   45],
+       [8759,    0,   45],
+       [9193,    0,   45],
+       [9446,    0,   45],
+       [9699,    0,   45]])
+
+#note that the "dot syntax", like raw.plot() means we are operating on the object 'raw'
+
+#creating trigger codes:
+In [33]: codes = {'long/fit':251, 'long/no-fit':252, 'short/fit':253, 'short/no-fit':254}
+
+In [34]: epochs = mne.Epochs(raw,events=events,event_id=codes,tmin=-0.2, tmax=1.2, detrend=1, baseline=None)
+120 matching events found
+0 projection items activated
+#we chose detrend=1 which is just linear detrending, you can almost always use it for typical recordings in language,because it just pulls out a flat line, if there is no such line, it will pull out nothing
+#another advantage of detrend=1 is that we have no baseline and weak filter, but we still see lines at 0
+#voltage are differences, so we don't care about absolute values - but some reviewers insist on baseline
+
+In [37]: %ls
+garfield0001.eeg*  garfield0002.eeg*  garfield0003.eeg*  garfield0004.eeg*  garfield0005.eeg*
+garfield0001.vhdr* garfield0002.vhdr* garfield0003.vhdr* garfield0004.vhdr* garfield0005.vhdr*
+garfield0001.vmrk* garfield0002.vmrk* garfield0003.vmrk* garfield0004.vmrk* garfield0005.vmrk*
+
+
+#we write a piece of code to rename subject files to always have double digits
+#we want a list of single subject averages by condition
+#create an empty dictionary in the first loop, and add subjects later
+#for each condition c generate a single subject average
+
+#see the plot:
+In [43]: mne.viz.plot_compare_evokeds(ssavg,picks=[13], invert_y=True, ci=.83)
+
+#now we have a script for all subjects averages (as csv)
+
+#but we forgot to set the sensors in 'montage' (for knowing where electrodes are) and 'layout' (for plotting)
+
+In [44]: epochs.plot_sensors()
+
+#to plot grand averages all by themselves
+In [47]: longfit = mne.grand_average(ssavg['long/fit'])
+Identiying common channels ...
+all channels are corresponding, nothing to do.
+
+In [48]: longfit
+Out[48]: <Evoked  |  comment : 'Grand average (n = 5)', kind : average, time : [-0.200000, 1.200000], n_epochs : 5, n_channels x n_times : 28 x 701, ~209 kB>
+#this itself is an evagrage, the evoked class in MNE, so we can do the same as with single subjects averages
+
+
+shortfit = mne.grand_average(ssavg['short/fit'])
+longnofit = mne.grand_average(ssavg['long/no-fit'])
+shortnofit = mne.grand_average(ssavg['short/no-fit'])
+
+
+#we can compare conditions - nofit minus fit
+fit = mne.combine_evoked([longnofit,shortnofit,longfit,shortfit],[1,1,-1,-1])
+
+length = mne.combine_evoked([longnofit, longfit, shornofit, shortfit], [-1, -1, 1, 1])
+
+In [62]: fit.plot_joint()
+Out[62]: <matplotlib.figure.Figure at 0x1c1971fc88>
+#to save, just press the little icon
+#we can modify the format:
+fig = it.plot_joint()
+fig.savefig('example.pdf') #and you can clip the pdf but sometimes it clips it too tight
+fig.savefig('example.pdf', bbox_inches='tight')
+fig.savefig('example.eps', bbox_inches='tight') #as eps or tiff, eps doesn't support as much color depth
+
+#there is a package for plotting and there tons of options
+sns.set_style
+
+In [67]: fit.plot_topo()
+#you get the topographical plots of difference waves, but it is hard to get the colors easily because different backends gets used, but there are many options so you can try to get colors for this plot
+
+
+#in Elizabeth's data there are triggers at word onset, but MNE has different possibilities, e.g. array indexing for a trigger that changes depending on what was 5 triggers before current trigger
+#example of this in his file
+https://bitbucket.org/palday/abraxas/src/176a2823e17258109ac034df520a2325e32e771f/erp.py?at=master&fileviewer=file-view-default
+# extract events that had a correct response
+# Elizabeth had 4 point rating:
+https://gitlab.com/palday/odie/blob/master/advanced_triggers.py
+# when we select trials based on rating, the may be problems with averaging because there may be some empty cells where ratings are missing, etc.
+# and this script must be fixed with correct names for some stuff
+
+#She tested something like:
+Context: Anna got a cold.
+A. Instead of a Post Office she went to the Pharmacy. (she notes that recency is a confound, so replication in Exp 2)
+B. She went to the Pharmacy.
+Target. She brought a (1) packet/ (2) prescription.
+
+A1 - active script no fit
+A2 - active script fit
+B1 - inactive no fit
+B2 - inactive fit
+
+Barbaras-MacBook-Pro:Garfield administrator$ R --vanilla
+
+R version 3.4.1 (2017-06-30) -- "Single Candle"
+Copyright (C) 2017 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin15.6.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(lme4)
+Loading required package: Matrix
+> d <- data.frame()
+> d <- read.csv("garfield0001.csv")
