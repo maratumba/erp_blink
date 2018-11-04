@@ -20,7 +20,9 @@ event_adjectives = {'sem-yes-x': 203,
     'abs—min-yes-x': 233,
     'abs—min-no-x': 238,
     'abs—max-yes-x': 243,
-    'abs—max-no-x': 248}
+    'abs—max-no-x': 248,
+    'filler-no':249
+    }
 
 tmin, tmax = -0.2, 0.5
 baseline = (None, 0.0)
