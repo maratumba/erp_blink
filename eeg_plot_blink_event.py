@@ -16,7 +16,7 @@ except:
 
 mne.add_reference_channels(raw, 'LiRef', copy=False)
 raw.set_eeg_reference(['ReRef','LiRef'])
-raw.filter(0.1,30, method='fir') 
+raw.filter(0.1,30, method='fir', picks=[27,28,29,30]) 
 
 event_id = {'sem-yes-x': 203,
     'sem-no-x': 208,

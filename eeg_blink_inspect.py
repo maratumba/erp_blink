@@ -5,13 +5,13 @@ import mne
 
 # Load the file and add a virtual channel for re-referencing:
 
-raw=mne.io.read_raw_brainvision('Obj0002.vhdr',preload=True)
+raw=mne.io.read_raw_brainvision('Obj0001.vhdr',preload=True)
 mne.add_reference_channels(raw, 'LiRef', copy=False)
 raw.set_eeg_reference(['ReRef','LiRef'])
 
 raw.filter(0.1,30, method='fir') 
 
-event_id = {'sem-yes-x': 203,
+event_adjectives = {'sem-yes-x': 203,
     'sem-no-x': 208,
     'world-yes-x': 213,
     'world-no-x': 218,
@@ -27,7 +27,7 @@ baseline = (None, 0.0)
 raw.set_channel_types({'EOGli':'eog','EOGre':'eog','EOGobre':'eog','EOGunre':'eog'})
 reject = {'eog': 40e-6}
 
-picks = mne.pick_types(raw.info,eog=True)
+picks = mne.pick_types(raw.info,eeg=True,eog=True)
 events = mne.find_events(raw)
 
 #######################
@@ -47,54 +47,21 @@ rev_event_dict = {
 }
 event_dict ={v: k for k, v in rev_event_dict.items()}
 
-# Construct event annotations:
-event_annotations=[]
-for event in events:
-    if event[2] in event_dict.keys():
-        event_annotations.append(event_dict[event[2]])
-    else:
-        event_annotations.append(str(event[2]))
-
-###############################################################################
-######################## Plot with annotated blinks ###########################
-eog_events = mne.preprocessing.find_eog_events(raw)
-n_blinks = len(eog_events)
-n_events = len(events)
-# Center to cover the whole blink with full duration of 0.5s:
-onset_bl = eog_events[:, 0] / raw.info['sfreq'] - 0.25
-duration_bl = np.repeat(0.5, n_blinks)
-
-onset_ev = events[:, 0] / raw.info['sfreq'] - 0.25
-duration_ev = np.repeat(0.5, n_events)
-
-onset = np.hstack((onset_bl,onset_ev))
-duration = np.hstack((duration_bl,duration_ev))
-
-comb_events = np.vstack((eog_events,events))
-raw.annotations = mne.Annotations(onset, duration, ['bad blink'] * n_blinks + event_annotations,
-                                  orig_time=raw.info['meas_date'])
-print(raw.annotations)  # to get information about what annotations we have
-raw.plot(events=comb_events)  # To see the annotated segments.
-###############################################################################
-
 
 # Calculate epochs
 epochs = mne.Epochs(raw, 
                     events=events, 
-                    event_id=event_id, 
+                    event_id=event_adjectives, 
                     tmin=tmin,
                     tmax=tmax, 
                     baseline=None, 
                     detrend=0,
-                    reject=reject, 
                     picks=picks)
 
-epochs.drop_bad()
-epochs.plot_drop_log()
+#epochs.drop_bad()
+#epochs.plot_drop_log()
 
 epochs.plot()
-
-
 
 
 '''
